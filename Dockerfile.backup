@@ -1,0 +1,55 @@
+# gcloud-conda
+# This image provides a dual environment with conda (Python 3) and gcloud installed
+# It is ready to be configured for additional apps 
+
+FROM google/cloud-sdk:169.0.0-alpine
+MAINTAINER Ryan Stauffer <ryan.stauffer@drivenbrands.com>
+
+# Configure Environment
+ENV CONDA_DIR /opt/conda
+
+# Miniconda Version and URIs
+ENV MINICONDA_VER 4.3.21
+ENV MINICONDA Miniconda3-$MINICONDA_VER-Linux-x86_64.sh
+ENV MINICONDA_URI https://repo.continuum.io/miniconda/$MINICONDA
+ENV MINICONDA_MD5_SUM c1c15d3baba15bf50293ae963abef853
+
+
+
+ENV ALPINE_GLIBC_BASE_URL https://github.com/sgerrand/alpine-pkg-glibc/releases/download
+ENV ALPINE_GLIBC_PACKAGE_VERSION 2.25-r0
+ENV ALPINE_GLIBC_BASE_PACKAGE_FILENAME glibc-$ALPINE_GLIBC_PACKAGE_VERSION.apk
+ENV ALPINE_GLIBC_URI $ALPINE_GLIBC_BASE_URL/$ALPINE_GLIBC_PACKAGE_VERSION/$ALPINE_GLIBC_BASE_PACKAGE_FILENAME
+
+
+
+# We remove libc6 and add glibc in order to install Miniconda 
+
+# Install glibc
+RUN apk update && \
+	apk --no-cache add \
+	ca-certificates \
+	openssl \
+	libstdc++ \
+	libgcc
+
+RUN cd /tmp && \
+	wget -q -O /etc/apk/keys/sgerrand.rsa.pub \
+		https://raw.githubusercontent.com/sgerrand/alpine-pkg-glibc/master/sgerrand.rsa.pub && \
+	wget $ALPINE_GLIBC_URI && \
+	apk del libc6-compat && \
+	apk add --allow-untrusted $ALPINE_GLIBC_BASE_PACKAGE_FILENAME && \
+	rm $ALPINE_GLIBC_BASE_PACKAGE_FILENAME
+
+# Install Miniconda
+RUN cd /tmp && \
+	mkdir -p $CONDA_DIR && \
+	curl -L $MINICONDA_URI -o $MINICONDA && \
+	echo "$MINICONDA_MD5_SUM  $MINICONDA" | md5sum -c - && \
+	/bin/bash $MINICONDA -b -f -p $CONDA_DIR && \
+	rm $MINICONDA
+
+ENV PATH $CONDA_DIR/bin:$PATH
+
+
+ENTRYPOINT ["/bin/bash"]
